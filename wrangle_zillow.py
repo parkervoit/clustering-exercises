@@ -49,7 +49,14 @@ def wrangle_zillow(db_name = 'zillow', username = env.username, password = env.p
                     LEFT JOIN typeconstructiontype AS construction USING (typeconstructiontypeid) 
                     WHERE  prop.latitude IS NOT NULL 
                     AND prop.longitude IS NOT NULL''', get_connection('zillow'))
+        zillow_df = remove_outliers(zillow_df, 1.5, ['bedroomcnt','bathroomcnt','calculatedfinishedsquarefeet'])
+        zillow_df = drop_nulls(zillow_df, prop_req_col = .75)
+        zillow_df = zillow_df.drop(columns = ['finishedsquarefeet12','lotsizesquarefeet','regionidcity','regionidzip','censustractandblock','roomcnt','rawcensustractandblock','regionidcounty','assessmentyear','propertycountylandusecode'])
+        zillow_df['latitude'] /= 1000000.
+        zillow_df['longitude'] /= 1000000.
+        zillow_df.dropna(inplace = True)
         zillow_df.to_csv('zillow.csv')
+        return zillow_df
 
 def missing_values_table(df):
     '''
@@ -186,4 +193,35 @@ def encode_values(df):
     label_encoder = sklearn.preprocessing.LabelEncoder()
     for x in df.select_dtypes(include = 'category'):
         df[x] = label_encoder.fit_transform(df[x])
+    return df
+
+def remove_outliers(df, k, col_list):
+    ''' remove outliers from a list of columns in a dataframe 
+        and return that dataframe
+    '''
+    
+    for col in col_list:
+
+        q1, q3 = df[f'{col}'].quantile([.25, .75])  # get quartiles
+        
+        iqr = q3 - q1   # calculate interquartile range
+        
+        upper_bound = q3 + k * iqr   # get upper bound
+        lower_bound = q1 - k * iqr   # get lower bound
+
+        # return dataframe without outliers
+        
+        df = df[(df[f'{col}'] > lower_bound) & (df[f'{col}'] < upper_bound)]
+        
+    return df
+
+def impute(df, strategy, column_list):
+    ''' take in a df strategy and list of columns to impute
+        return imputed df
+    '''
+        
+    imputer = SimpleImputer(strategy=strategy)  
+
+    df[col] = imputer.fit_transform(df[col])
+
     return df
