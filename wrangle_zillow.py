@@ -13,6 +13,21 @@ def get_connection(db_name, username = env.username, host=env.host, password=env
     info as plain text. 
     '''
     return f'mysql+pymysql://{username}:{password}@{host}/{db_name}'
+    
+def wrangle_mall(db_name = 'mall_customers', username = env.username, password = env.password, host = env.host):
+    ''' Checks for mall.csv file and imports it if present. If absent, pulls all columns from customers. Then it will drop
+    nulls and drop duplicates'''
+    filename = 'mall.csv'
+    if os.path.isfile(filename):
+        mall_df = pd.read_csv(filename, index_col=0)
+        return mall_df
+    else:
+        mall_df = pd.read_sql('''SELECT * FROM customers''', get_connection('mall_customers'))
+        mall_df = mall_df.dropna()
+        mall_df = mall_df.drop_duplicates()
+        mall_df.drop(column = 'customer_id')
+        mall_df.to_csv('mall.csv')
+        return  mall_df 
 
 def wrangle_zillow(db_name = 'zillow', username = env.username, password = env.password, host = env.host):
     ''' 
